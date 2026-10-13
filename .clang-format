@@ -1,0 +1,7 @@
+BasedOnStyle: LLVM
+# BreakBeforeBraces: Linux
+ColumnLimit: 180
+NamespaceIndentation: All
+AlwaysBreakTemplateDeclarations: Yes
+Cpp11BracedListStyle: true
+Standard: Auto
