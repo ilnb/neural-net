@@ -1,11 +1,11 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.20)
 project(neural-net LANGUAGES CXX)
 
 add_library(neural
   src/tensor/tensor.cpp
 )
 
-target_compile_features(neural PUBLIC cxx_std_26)
+target_compile_features(neural PUBLIC cxx_std_23)
 
 target_include_directories(neural
   PUBLIC
