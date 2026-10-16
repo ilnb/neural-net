@@ -1,6 +1,8 @@
 #pragma once
 
+#include <array>
 #include <concepts>
+#include <initializer_list>
 #include <limits>
 #include <ranges>
 #include <stdexcept>
@@ -9,7 +11,7 @@
 
 namespace NN {
   template <typename R, typename T>
-  concept ConvIntervalOf = std::ranges::random_access_range<R> and std::convertible_to<std::ranges::range_reference_t<R>, T>;
+  concept ConvIntervalOf = std::ranges::random_access_range<R> and std::convertible_to<std::ranges::range_value_t<R>, T>;
 
   struct Tensor {
     std::vector<float> data;
@@ -28,15 +30,22 @@ namespace NN {
     Tensor &operator=(Tensor &&b) noexcept;
 
     template <typename R>
-      requires ConvIntervalOf<R, size_t>
+      requires ConvIntervalOf<R, size_t> and std::integral<std::ranges::range_value_t<R>>
     explicit Tensor(R &&r) : shape(std::ranges::begin(r), std::ranges::end(r)) {
       const size_t n = checked_num_el(shape);
       finalize_shape(n, false);
     }
 
+    template <typename T>
+      requires std::integral<T>
+    explicit Tensor(std::initializer_list<T> l) : shape(l.begin(), l.end()) {
+      const size_t n = checked_num_el(shape);
+      finalize_shape(n, false);
+    }
+
     template <typename... Args>
-      requires(std::convertible_to<Args, size_t> && ...)
-    Tensor(Args... dims) : shape{static_cast<size_t>(dims)...} {
+      requires(std::integral<Args> && ...)
+    explicit Tensor(Args... dims) : shape{static_cast<size_t>(dims)...} {
       const size_t n = checked_num_el(shape);
       finalize_shape(n, false);
     }
@@ -60,7 +69,7 @@ namespace NN {
 
     // Clears data vector if @clear is set
     template <typename R>
-      requires ConvIntervalOf<R, size_t>
+      requires std::integral<std::ranges::range_value_t<R>>
     Tensor &set_dims(R &&r, const bool clear = true) {
       assign_shape(std::forward<R>(r), clear);
       return *this;
@@ -70,7 +79,7 @@ namespace NN {
     Tensor &set_dims(std::vector<size_t> &&v, const bool clear = true);
 
     template <typename R>
-      requires ConvIntervalOf<R, size_t> and std::ranges::sized_range<R>
+      requires ConvIntervalOf<R, size_t> and std::ranges::sized_range<R> and std::integral<std::ranges::range_value_t<R>>
     float &at(R &&r) {
       if (std::ranges::size(r) != shape.size())
         throw std::invalid_argument("Number of indices doesnt match tensor rank.");
@@ -84,8 +93,14 @@ namespace NN {
       return data[offset];
     }
 
+    template <typename T>
+      requires std::integral<T>
+    float &at(std::initializer_list<T> l) {
+      return at<std::initializer_list<T> &>(l); // bounds above to itr-indexing
+    }
+
     template <typename... Args>
-      requires(std::convertible_to<Args, size_t> && ...)
+      requires(std::integral<Args> && ...)
     float &at(Args... idx) {
       return at(std::array<size_t, sizeof...(Args)>{static_cast<size_t>(idx)...});
     }
@@ -111,7 +126,7 @@ namespace NN {
 
   private:
     template <typename R>
-      requires ConvIntervalOf<R, size_t>
+      requires ConvIntervalOf<R, size_t> and std::integral<std::ranges::range_value_t<R>>
     void assign_shape(R &&dims, const bool clear) {
       const size_t n = checked_num_el(dims);
       shape.assign_range(dims);
@@ -119,7 +134,7 @@ namespace NN {
     }
 
     template <typename R>
-      requires ConvIntervalOf<R, size_t>
+      requires ConvIntervalOf<R, size_t> and std::integral<std::ranges::range_value_t<R>>
     static size_t checked_num_el(R &&s) {
       if (std::ranges::empty(s))
         throw std::invalid_argument("Empty size vector.");
