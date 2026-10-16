@@ -1,7 +1,6 @@
 #include "tensor/tensor.hpp"
 #include <algorithm>
 #include <functional>
-#include <limits>
 #include <stdexcept>
 
 namespace NN {
@@ -17,8 +16,23 @@ namespace NN {
     return n;
   }
 
-  void Tensor::update_to_shape() {
-    num_el = checked_num_el(shape);
+  void Tensor::assign_shape(std::vector<size_t> &&dims, const bool clear) {
+    const size_t n = checked_num_el(dims);
+    shape = std::move(dims);
+    finalize_shape(n, clear);
+  }
+
+  void Tensor::finalize_shape(const size_t n, const bool clear) {
+    num_el = n;
+  void Tensor::assign_shape(std::vector<size_t> &&dims, const bool clear) {
+    const size_t n = checked_num_el(dims);
+    shape = std::move(dims);
+    finalize_shape(n, clear);
+    data.resize(num_el);
+    if (clear)
+      data.clear();
+  }
+
     data.resize(num_el);
   }
 
@@ -26,7 +40,12 @@ namespace NN {
     if (shape != b.shape)
       throw std::invalid_argument("Tensors of different shapes.");
     if (num_el == 0 or data.size() != num_el or b.data.size() != b.num_el)
+
+    if (num_el == 0 or b.num_el == 0 or data.size() == 0 or b.data.size() == 0)
       throw std::invalid_argument("Tensor data is not initialized.");
+
+    if (num_el != b.num_el or data.size() != num_el or b.data.size() != b.num_el)
+      throw std::logic_error("Malformed num_el or data.");
   }
 
   Tensor &Tensor::set_data(std::vector<float> &&v) {
@@ -37,12 +56,7 @@ namespace NN {
   }
 
   Tensor &Tensor::set_dims(std::vector<size_t> &&v, const bool clear) {
-    const size_t n = checked_num_el(v);
-    shape = std::move(v);
-    num_el = n;
-    data.resize(num_el);
-    if (clear)
-      data.clear();
+    assign_shape(std::move(v), clear);
     return *this;
   }
 
