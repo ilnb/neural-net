@@ -15,18 +15,20 @@ namespace NN {
   struct Tensor {
     std::vector<float> data;
     std::vector<size_t> shape;
+    std::vector<size_t> strides;
     size_t num_el{};
 
     Tensor() = default;
 
     Tensor(const Tensor &b) = default;
 
-    Tensor(Tensor &&b) noexcept : data(std::move(b.data)), shape(std::move(b.shape)), num_el(b.num_el) { b.num_el = 0; }
+    Tensor(Tensor &&b) noexcept : data(std::move(b.data)), shape(std::move(b.shape)), strides(std::move(b.strides)), num_el(b.num_el) { b.num_el = 0; }
 
     Tensor &operator=(const Tensor &b) {
       if (this != &b) {
         data = b.data;
         shape = b.shape;
+        strides = b.strides;
         num_el = b.num_el;
       }
       return *this;
@@ -36,6 +38,7 @@ namespace NN {
       if (this != &b) {
         data = std::move(b.data);
         shape = std::move(b.shape);
+        strides = std::move(b.strides);
         num_el = b.num_el;
         b.num_el = 0;
       }
@@ -75,6 +78,27 @@ namespace NN {
 
     // Clears data vector if @clear is set
     Tensor &set_dims(std::vector<size_t> &&v, const bool clear = true);
+
+    template <typename R>
+      requires ConvIntervalOf<R, size_t> and std::ranges::sized_range<R>
+    float &at(R &&r) {
+      if (std::ranges::size(r) != shape.size())
+        throw std::invalid_argument("Number of indices doesnt match tensor rank.");
+      auto it = std::ranges::begin(r); // supports more types
+      size_t offset = 0;
+      for (size_t i = 0; i < shape.size(); i++) {
+        if (it[i] >= shape[i])
+          throw std::out_of_range("Tensor index out of bounds.");
+        offset += it[i] * strides[i];
+      }
+      return data[offset];
+    }
+
+    template <typename T>
+      requires std::convertible_to<T, size_t>
+    float &at(std::initializer_list<T> l) {
+      return at<std::initializer_list<T> &>(l); // bounds above to itr-indexing
+    }
 
     Tensor &add(const Tensor &b);
     // Creates another tensor
@@ -120,9 +144,10 @@ namespace NN {
       return n;
     }
 
+    static std::vector<size_t> compute_strides(const std::vector<size_t> &shape);
     void assign_shape(std::vector<size_t> &&dims, const bool clear);
     void valid_dim_pair(const Tensor &b) const;
-    static size_t checked_num_el(const std::vector<size_t> &s);
+    bool valid_strides() const;
     void finalize_shape(size_t n, bool clear);
   };
 } // namespace NN

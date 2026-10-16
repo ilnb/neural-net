@@ -4,16 +4,14 @@
 #include <stdexcept>
 
 namespace NN {
-  size_t Tensor::checked_num_el(const std::vector<size_t> &s) {
-    size_t n = 1;
-    for (size_t x : s) {
-      if (x == 0)
-        throw std::invalid_argument("Tensor dimensions must be positive.");
-      if (n > std::numeric_limits<size_t>::max() / x)
-        throw std::overflow_error("Tensor size overflow");
-      n *= x;
+  std::vector<size_t> Tensor::compute_strides(const std::vector<size_t> &shape) {
+    std::vector<size_t> strides(shape.size());
+    size_t acc = 1;
+    for (size_t i = shape.size(); i-- > 0;) {
+      strides[i] = acc;
+      acc *= shape[i];
     }
-    return n;
+    return strides;
   }
 
   void Tensor::assign_shape(std::vector<size_t> &&dims, const bool clear) {
@@ -24,22 +22,27 @@ namespace NN {
 
   void Tensor::finalize_shape(const size_t n, const bool clear) {
     num_el = n;
-  void Tensor::assign_shape(std::vector<size_t> &&dims, const bool clear) {
-    const size_t n = checked_num_el(dims);
-    shape = std::move(dims);
-    finalize_shape(n, clear);
+    strides.resize(shape.size());
+    for (size_t i = 0, tmp = num_el; i < shape.size(); i++) {
+      tmp /= shape[i];
+      strides[i] = tmp;
+    }
     data.resize(num_el);
     if (clear)
       data.clear();
   }
 
-    data.resize(num_el);
+  bool Tensor::valid_strides() const {
+    // NOTE: contiguous row-major; relax once non-contiguous views exist.
+    return strides == compute_strides(shape);
   }
 
   void Tensor::valid_dim_pair(const Tensor &b) const {
     if (shape != b.shape)
       throw std::invalid_argument("Tensors of different shapes.");
-    if (num_el == 0 or data.size() != num_el or b.data.size() != b.num_el)
+
+    if (not valid_strides() or not b.valid_strides())
+      throw std::invalid_argument("Malformed strides.");
 
     if (num_el == 0 or b.num_el == 0 or data.size() == 0 or b.data.size() == 0)
       throw std::invalid_argument("Tensor data is not initialized.");
