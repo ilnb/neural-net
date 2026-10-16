@@ -4,6 +4,27 @@
 #include <stdexcept>
 
 namespace NN {
+  Tensor &Tensor::operator=(const Tensor &b) {
+    if (this != &b) {
+      data = b.data;
+      shape = b.shape;
+      strides = b.strides;
+      num_el = b.num_el;
+    }
+    return *this;
+  }
+
+  Tensor &Tensor::operator=(Tensor &&b) noexcept {
+    if (this != &b) {
+      data = std::move(b.data);
+      shape = std::move(b.shape);
+      strides = std::move(b.strides);
+      num_el = b.num_el;
+      b.num_el = 0;
+    }
+    return *this;
+  }
+
   std::vector<size_t> Tensor::compute_strides(const std::vector<size_t> &shape) {
     std::vector<size_t> strides(shape.size());
     size_t acc = 1;

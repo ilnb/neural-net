@@ -1,7 +1,6 @@
 #pragma once
 
 #include <concepts>
-#include <initializer_list>
 #include <limits>
 #include <ranges>
 #include <stdexcept>
@@ -24,36 +23,21 @@ namespace NN {
 
     Tensor(Tensor &&b) noexcept : data(std::move(b.data)), shape(std::move(b.shape)), strides(std::move(b.strides)), num_el(b.num_el) { b.num_el = 0; }
 
-    Tensor &operator=(const Tensor &b) {
-      if (this != &b) {
-        data = b.data;
-        shape = b.shape;
-        strides = b.strides;
-        num_el = b.num_el;
-      }
-      return *this;
-    }
+    Tensor &operator=(const Tensor &b);
 
-    Tensor &operator=(Tensor &&b) noexcept {
-      if (this != &b) {
-        data = std::move(b.data);
-        shape = std::move(b.shape);
-        strides = std::move(b.strides);
-        num_el = b.num_el;
-        b.num_el = 0;
-      }
-      return *this;
-    }
+    Tensor &operator=(Tensor &&b) noexcept;
 
     template <typename R>
       requires ConvIntervalOf<R, size_t>
     explicit Tensor(R &&r) : shape(std::ranges::begin(r), std::ranges::end(r)) {
-      const size_t n = checked_num_el(std::forward<R>(r));
+      const size_t n = checked_num_el(shape);
       finalize_shape(n, false);
     }
 
-    explicit Tensor(std::initializer_list<size_t> r) : shape(r) {
-      const size_t n = checked_num_el(std::forward<std::initializer_list<size_t>>(r));
+    template <typename... Args>
+      requires(std::convertible_to<Args, size_t> && ...)
+    Tensor(Args... dims) : shape{static_cast<size_t>(dims)...} {
+      const size_t n = checked_num_el(shape);
       finalize_shape(n, false);
     }
 
@@ -64,6 +48,12 @@ namespace NN {
         throw std::invalid_argument("Data ranges are of different size.");
       data.assign_range(r);
       return *this;
+    }
+
+    template <typename... Args>
+      requires(std::convertible_to<Args, float> && ...)
+    Tensor &set_data(Args... vals) {
+      return set_data(std::array<float, sizeof...(Args)>{static_cast<float>(vals)...});
     }
 
     Tensor &set_data(std::vector<float> &&v);
@@ -94,10 +84,10 @@ namespace NN {
       return data[offset];
     }
 
-    template <typename T>
-      requires std::convertible_to<T, size_t>
-    float &at(std::initializer_list<T> l) {
-      return at<std::initializer_list<T> &>(l); // bounds above to itr-indexing
+    template <typename... Args>
+      requires(std::convertible_to<Args, size_t> && ...)
+    float &at(Args... idx) {
+      return at(std::array<size_t, sizeof...(Args)>{static_cast<size_t>(idx)...});
     }
 
     Tensor &add(const Tensor &b);
