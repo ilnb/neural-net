@@ -166,10 +166,29 @@ namespace NN {
     static Tensor mul(const Tensor &a, const Tensor &b);
     static Tensor matmul(const Tensor &a, const Tensor &b);
 
+    Tensor operator-() const;
+
+    Tensor operator+(const float x) const;
+    friend Tensor operator+(const float x, const Tensor &a);
+    Tensor &operator+=(const float x);
+
+    Tensor operator-(const float x) const;
+    friend Tensor operator-(const float x, const Tensor &a);
+    Tensor &operator-=(const float x);
+
+    Tensor operator*(const float x) const;
+    friend Tensor operator*(const float x, const Tensor &a);
+    Tensor &operator*=(const float x);
+
+    Tensor operator/(const float x) const;
+    Tensor &operator/=(const float x);
+
     Tensor operator+(const Tensor &b) const;
     Tensor &operator+=(const Tensor &b);
     Tensor operator-(const Tensor &b) const;
     Tensor &operator-=(const Tensor &b);
+
+    bool empty() const;
 
   private:
     template <typename R>

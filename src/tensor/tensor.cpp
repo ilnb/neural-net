@@ -58,6 +58,8 @@ namespace NN {
     return strides == compute_strides(shape);
   }
 
+  bool Tensor::empty() const { return num_el == 0 or data.size() == 0; }
+
   void Tensor::valid_dim_pair(const Tensor &b) const {
     if (shape != b.shape)
       throw std::invalid_argument("Tensors of different shapes.");
@@ -65,7 +67,7 @@ namespace NN {
     if (not valid_strides() or not b.valid_strides())
       throw std::invalid_argument("Malformed strides.");
 
-    if (num_el == 0 or b.num_el == 0 or data.size() == 0 or b.data.size() == 0)
+    if (empty() or b.empty())
       throw std::invalid_argument("Tensor data is not initialized.");
 
     if (num_el != b.num_el or data.size() != num_el or b.data.size() != b.num_el)
@@ -84,6 +86,13 @@ namespace NN {
     return *this;
   }
 
+  Tensor &Tensor::add(const float x) {
+    if (empty())
+      throw std::invalid_argument("Empty tensor.");
+    std::ranges::for_each(data, [x](float &v) { v += x; });
+    return *this;
+  }
+
   Tensor &Tensor::add(const Tensor &b) {
     valid_dim_pair(b);
     std::ranges::transform(data, b.data, data.begin(), std::plus<>());
@@ -93,11 +102,21 @@ namespace NN {
   Tensor Tensor::add(const Tensor &a, const Tensor &b) {
     auto c = a;
     return c.add(b);
+  Tensor Tensor::cadd(const float x) const {
+    auto c = *this;
+    c.add(x);
+    return c;
   }
 
   Tensor Tensor::cadd(const Tensor &b) const {
     auto c = *this;
     return c.add(b);
+
+  Tensor &Tensor::sub(const float x) {
+    if (empty())
+      throw std::invalid_argument("Empty tensor.");
+    std::ranges::for_each(data, [x](float &v) { v -= x; });
+    return *this;
   }
 
   Tensor &Tensor::sub(const Tensor &b) {
@@ -109,6 +128,11 @@ namespace NN {
   Tensor Tensor::sub(const Tensor &a, const Tensor &b) {
     auto c = a;
     return c.sub(b);
+
+  Tensor Tensor::csub(const float x) const {
+    auto c = *this;
+    c.sub(x);
+    return c;
   }
 
   Tensor Tensor::csub(const Tensor &b) const {
@@ -119,6 +143,13 @@ namespace NN {
   Tensor &Tensor::mul(const Tensor &b) {
     valid_dim_pair(b);
     std::ranges::transform(data, b.data, data.begin(), std::multiplies<>());
+    return *this;
+  }
+
+  Tensor &Tensor::mul(const float x) {
+    if (empty())
+      throw std::invalid_argument("Empty tensor.");
+    std::ranges::for_each(data, [x](float &v) { v *= x; });
     return *this;
   }
 
@@ -159,7 +190,18 @@ namespace NN {
   Tensor Tensor::matmul(const Tensor &a, const Tensor &b) {
     auto c = a;
     return c.matmul(b);
+
+  Tensor Tensor::operator-() const {
+    auto c = *this;
+    std::ranges::for_each(c.data, [](float &x) { x = -x; });
+    return c;
   }
+
+  Tensor Tensor::operator+(const float x) const { return cadd(x); }
+
+  Tensor operator+(const float x, const Tensor &a) { return a.cadd(x); }
+
+  Tensor &Tensor::operator+=(const float x) { return add(x); }
 
   Tensor Tensor::operator+(const Tensor &b) const {
     auto c = *this;
@@ -168,10 +210,33 @@ namespace NN {
 
   Tensor &Tensor::operator+=(const Tensor &b) { return add(b); }
 
+  Tensor Tensor::operator-(const float x) const { return csub(x); }
+
+  Tensor &Tensor::operator-=(const float x) { return sub(x); }
+
+  Tensor &Tensor::operator-=(const Tensor &b) { return sub(b); }
+
   Tensor Tensor::operator-(const Tensor &b) const {
     auto c = *this;
     return c.sub(b);
   }
 
-  Tensor &Tensor::operator-=(const Tensor &b) { return sub(b); }
+  Tensor Tensor::operator*(const float x) const { return cmul(x); }
+
+  Tensor operator*(const float x, const Tensor &a) { return a.cmul(x); }
+
+  Tensor &Tensor::operator*=(const float x) { return mul(x); }
+
+  Tensor Tensor::operator/(const float x) const {
+    if (x == 0.0f)
+      throw std::domain_error("Division by zero.");
+    return cmul(1 / x);
+  }
+
+  Tensor &Tensor::operator/=(const float x) {
+    if (x == 0.0f)
+      throw std::domain_error("Division by zero.");
+    return mul(1 / x);
+  }
+
 } // namespace NN
