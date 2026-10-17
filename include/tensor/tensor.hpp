@@ -13,8 +13,10 @@ namespace NN {
   template <typename R, typename T>
   concept ConvIntervalOf = std::ranges::random_access_range<R> and std::convertible_to<std::ranges::range_value_t<R>, T>;
 
+  using dtype = float; // type to represent raw values
+
   struct Tensor {
-    std::vector<float> data;
+    std::vector<dtype> data;
     std::vector<size_t> shape;
     std::vector<size_t> strides;
     size_t num_el{};
@@ -51,7 +53,7 @@ namespace NN {
     }
 
     template <typename R>
-      requires ConvIntervalOf<R, float> and std::ranges::sized_range<R>
+      requires ConvIntervalOf<R, dtype> and std::ranges::sized_range<R>
     Tensor &set_data(R &&r) {
       if (std::ranges::size(r) != num_el)
         throw std::invalid_argument("Data ranges are of different size.");
@@ -60,12 +62,12 @@ namespace NN {
     }
 
     template <typename... Args>
-      requires(std::convertible_to<Args, float> and ...)
+      requires(std::convertible_to<Args, dtype> and ...)
     Tensor &set_data(Args... vals) {
-      return set_data(std::array<float, sizeof...(Args)>{static_cast<float>(vals)...});
+      return set_data(std::array<dtype, sizeof...(Args)>{static_cast<dtype>(vals)...});
     }
 
-    Tensor &set_data(std::vector<float> &&v);
+    Tensor &set_data(std::vector<dtype> &&v);
 
     // Clears data vector if @clear is set
     template <typename R>
@@ -142,18 +144,34 @@ namespace NN {
     Tensor &transpose();
     Tensor ctranspose() const;
 
-    Tensor &add(const float x);
-    Tensor &sub(const float x);
-    Tensor &mul(const float x);
+    bool empty() const;
+    dtype sum() const;
+    dtype mean() const;
+    dtype max() const;
+    dtype min() const;
+
+    Tensor &sum(size_t dim);
+    Tensor &mean(size_t dim);
+    Tensor &max(size_t dim);
+    Tensor &min(size_t dim);
+
+    Tensor csum(size_t dim) const;
+    Tensor cmean(size_t dim) const;
+    Tensor cmax(size_t dim) const;
+    Tensor cmin(size_t dim) const;
+
+    Tensor &add(const dtype x);
+    Tensor &sub(const dtype x);
+    Tensor &mul(const dtype x);
     Tensor &add(const Tensor &b);
     Tensor &sub(const Tensor &b);
     Tensor &mul(const Tensor &b);
     Tensor &matmul(const Tensor &b);
 
     // Copy based ops
-    Tensor cadd(const float x) const;
-    Tensor csub(const float x) const;
-    Tensor cmul(const float x) const;
+    Tensor cadd(const dtype x) const;
+    Tensor csub(const dtype x) const;
+    Tensor cmul(const dtype x) const;
     Tensor cadd(const Tensor &b) const;
     Tensor csub(const Tensor &b) const;
     Tensor cmul(const Tensor &b) const;
@@ -166,31 +184,25 @@ namespace NN {
 
     Tensor operator-() const;
 
-    Tensor operator+(const float x) const;
-    friend Tensor operator+(const float x, const Tensor &a);
-    Tensor &operator+=(const float x);
+    Tensor operator+(const dtype x) const;
+    friend Tensor operator+(const dtype x, const Tensor &a);
+    Tensor &operator+=(const dtype x);
 
-    Tensor operator-(const float x) const;
-    friend Tensor operator-(const float x, const Tensor &a);
-    Tensor &operator-=(const float x);
+    Tensor operator-(const dtype x) const;
+    friend Tensor operator-(const dtype x, const Tensor &a);
+    Tensor &operator-=(const dtype x);
 
-    Tensor operator*(const float x) const;
-    friend Tensor operator*(const float x, const Tensor &a);
-    Tensor &operator*=(const float x);
+    Tensor operator*(const dtype x) const;
+    friend Tensor operator*(const dtype x, const Tensor &a);
+    Tensor &operator*=(const dtype x);
 
-    Tensor operator/(const float x) const;
-    Tensor &operator/=(const float x);
+    Tensor operator/(const dtype x) const;
+    Tensor &operator/=(const dtype x);
 
     Tensor operator+(const Tensor &b) const;
     Tensor &operator+=(const Tensor &b);
     Tensor operator-(const Tensor &b) const;
     Tensor &operator-=(const Tensor &b);
-
-    bool empty() const;
-    float sum() const;
-    float mean() const;
-    float max() const;
-    float min() const;
 
   private:
     template <typename R>
@@ -215,6 +227,46 @@ namespace NN {
         n *= x;
       }
       return n;
+    }
+
+    template <typename Op>
+      requires std::invocable<Op, dtype, dtype> and std::convertible_to<std::invoke_result_t<Op, dtype, dtype>, dtype>
+    Tensor &reduce(size_t dim, dtype init, Op op) {
+      if (empty())
+        throw std::domain_error("Cant reduce an empty tensor.");
+      const size_t n = shape.size();
+      if (dim >= n)
+        throw std::out_of_range("Out of bounds axis.");
+      if (n == 1)
+        throw std::domain_error("Cant reduce a scalar.");
+
+      std::vector<size_t> new_size;
+      new_size.reserve(n - 1);
+      for (size_t i = 0; i < n; i++)
+        if (i != dim)
+          new_size.push_back(shape[i]);
+
+      Tensor ret(new_size);
+      for (size_t out = 0; out < ret.num_el; out++) {
+        size_t offset = 0, tmp = out;
+
+        for (size_t i = 0, j = 0; i < n; i++) {
+          if (i == dim)
+            continue;
+          const size_t coord = tmp / ret.strides[j];
+          tmp %= ret.strides[j];
+          offset += coord * strides[i];
+          j++;
+        }
+
+        auto val = init;
+        for (size_t k = 0; k < shape[dim]; k++)
+          val = op(val, data[offset + k * strides[dim]]);
+        ret.data[out] = val;
+      }
+
+      *this = std::move(ret);
+      return *this;
     }
 
     static std::vector<size_t> compute_strides(const std::vector<size_t> &shape);

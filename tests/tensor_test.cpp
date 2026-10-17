@@ -35,7 +35,7 @@ int main() {
   std::println("transpose: {}", t.data);
   std::println("shape: {}", t.shape);
   std::println("strides: {}", t.strides);
-  for (int i = 0; i < 2; i++)
+  for (int i = 0; i < 3; i++)
     for (int j = 0; j < 2; j++)
       std::println("t[{},{}] = {}", i, j, t[i, j]);
 
@@ -57,6 +57,20 @@ int main() {
   std::println("double transpose: {}", r.data);
   std::println("double transpose shape: {}", r.shape);
   std::println("double transpose strides: {}", r.strides);
+  std::println();
+
+  t = NN::Tensor(2, 3, 2);
+  t.set_data(3, 2, 5, 1, 6, 12, 9, 8, 10, 12, 14, 7);
+  std::println("reduce test");
+  std::println("data : {}", t.data);
+  std::println("shape : {}", t.shape);
+  std::println();
+  for (size_t i = 0; i < 3; i++) {
+    std::println("sum axis = {} : {}", i, t.csum(i).data);
+    std::println("mean axis = {} : {}", i, t.cmean(i).data);
+    std::println("max axis = {} : {}", i, t.cmax(i).data);
+    std::println("min axis = {} : {}", i, t.cmin(i).data);
+  }
   std::println();
   return 0;
 }

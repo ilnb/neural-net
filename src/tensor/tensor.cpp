@@ -1,6 +1,7 @@
 #include "tensor/tensor.hpp"
 #include <algorithm>
 #include <functional>
+#include <limits>
 #include <stdexcept>
 
 namespace NN {
@@ -65,8 +66,6 @@ namespace NN {
     return true;
   }
 
-  bool Tensor::empty() const { return num_el == 0 or data.size() == 0; }
-
   void Tensor::valid_dim_pair(const Tensor &b) const {
     if (shape != b.shape)
       throw std::invalid_argument("Tensors of different shapes.");
@@ -81,7 +80,7 @@ namespace NN {
       throw std::logic_error("Malformed num_el or data.");
   }
 
-  Tensor &Tensor::set_data(std::vector<float> &&v) {
+  Tensor &Tensor::set_data(std::vector<dtype> &&v) {
     if (num_el != v.size())
       throw std::invalid_argument("Data vectors are of different size.");
     data = std::move(v);
@@ -101,7 +100,7 @@ namespace NN {
     if (data.size() != num_el)
       throw std::invalid_argument("Malformed tensor data.");
     const size_t r = shape[0], c = shape[1];
-    std::vector<float> out(num_el);
+    std::vector<dtype> out(num_el);
     for (size_t i = 0; i < r; i++)
       for (size_t j = 0; j < c; j++)
         out[j * r + i] = data[i * c + j];
@@ -117,10 +116,79 @@ namespace NN {
     return c;
   }
 
-  Tensor &Tensor::add(const float x) {
+  bool Tensor::empty() const { return num_el == 0 or data.size() == 0; }
+
+  dtype Tensor::sum() const {
+    if (empty())
+      return 0;
+    return std::ranges::fold_left(data, 0, [](dtype s, dtype x) { return s + x; });
+  }
+
+  dtype Tensor::mean() const {
+    if (empty())
+      return 0;
+    return sum() / num_el;
+  }
+
+  dtype Tensor::min() const {
+    if (empty())
+      throw std::domain_error("Cant find minimum of empty tensor.");
+    return *std::ranges::min_element(data);
+  }
+
+  dtype Tensor::max() const {
+    if (empty())
+      throw std::domain_error("Cant find maximum of empty tensor.");
+    return *std::ranges::max_element(data);
+  }
+
+  Tensor &Tensor::sum(size_t dim) { return reduce(dim, 0.0f, std::plus<>()); }
+
+  Tensor Tensor::csum(size_t dim) const {
+    auto c = *this;
+    c.sum(dim);
+    return c;
+  }
+
+  Tensor &Tensor::mean(size_t dim) {
+    if (dim >= shape.size())
+      throw std::out_of_range("Out of bounds axis.");
+    const size_t f = shape[dim];
+    sum(dim);
+    std::ranges::for_each(data, [f](dtype &x) { x /= f; });
+    return *this;
+  }
+
+  Tensor Tensor::cmean(size_t dim) const {
+    auto c = *this;
+    c.mean(dim);
+    return c;
+  }
+
+  Tensor &Tensor::max(size_t dim) {
+    return reduce(dim, std::numeric_limits<dtype>::lowest(), [](dtype x, dtype v) { return std::max(x, v); });
+  }
+
+  Tensor Tensor::cmax(size_t dim) const {
+    auto c = *this;
+    c.max(dim);
+    return c;
+  }
+
+  Tensor &Tensor::min(size_t dim) {
+    return reduce(dim, std::numeric_limits<dtype>::max(), [](dtype x, dtype v) { return std::min(x, v); });
+  }
+
+  Tensor Tensor::cmin(size_t dim) const {
+    auto c = *this;
+    c.min(dim);
+    return c;
+  }
+
+  Tensor &Tensor::add(const dtype x) {
     if (empty())
       throw std::invalid_argument("Empty tensor.");
-    std::ranges::for_each(data, [x](float &v) { v += x; });
+    std::ranges::for_each(data, [x](dtype &v) { v += x; });
     return *this;
   }
 
@@ -136,7 +204,7 @@ namespace NN {
     return c;
   }
 
-  Tensor Tensor::cadd(const float x) const {
+  Tensor Tensor::cadd(const dtype x) const {
     auto c = *this;
     c.add(x);
     return c;
@@ -148,10 +216,10 @@ namespace NN {
     return c;
   }
 
-  Tensor &Tensor::sub(const float x) {
+  Tensor &Tensor::sub(const dtype x) {
     if (empty())
       throw std::invalid_argument("Empty tensor.");
-    std::ranges::for_each(data, [x](float &v) { v -= x; });
+    std::ranges::for_each(data, [x](dtype &v) { v -= x; });
     return *this;
   }
 
@@ -167,7 +235,7 @@ namespace NN {
     return c;
   }
 
-  Tensor Tensor::csub(const float x) const {
+  Tensor Tensor::csub(const dtype x) const {
     auto c = *this;
     c.sub(x);
     return c;
@@ -185,10 +253,10 @@ namespace NN {
     return *this;
   }
 
-  Tensor &Tensor::mul(const float x) {
+  Tensor &Tensor::mul(const dtype x) {
     if (empty())
       throw std::invalid_argument("Empty tensor.");
-    std::ranges::for_each(data, [x](float &v) { v *= x; });
+    std::ranges::for_each(data, [x](dtype &v) { v *= x; });
     return *this;
   }
 
@@ -198,7 +266,7 @@ namespace NN {
     return c;
   }
 
-  Tensor Tensor::cmul(const float x) const {
+  Tensor Tensor::cmul(const dtype x) const {
     auto c = *this;
     c.mul(x);
     return c;
@@ -219,7 +287,7 @@ namespace NN {
     Tensor ret(shape[0], b.shape[1]);
     for (size_t i = 0; i < shape[0]; i++) {
       for (size_t j = 0; j < b.shape[1]; j++) {
-        float sum = 0.0f;
+        dtype sum = 0;
         for (size_t k = 0; k < shape[1]; k++)
           sum += at(i, k) * b.at(k, j);
         ret.at(i, j) = sum;
@@ -243,15 +311,15 @@ namespace NN {
 
   Tensor Tensor::operator-() const {
     auto c = *this;
-    std::ranges::for_each(c.data, [](float &x) { x = -x; });
+    std::ranges::for_each(c.data, [](dtype &x) { x = -x; });
     return c;
   }
 
-  Tensor Tensor::operator+(const float x) const { return cadd(x); }
+  Tensor Tensor::operator+(const dtype x) const { return cadd(x); }
 
-  Tensor operator+(const float x, const Tensor &a) { return a.cadd(x); }
+  Tensor operator+(const dtype x, const Tensor &a) { return a.cadd(x); }
 
-  Tensor &Tensor::operator+=(const float x) { return add(x); }
+  Tensor &Tensor::operator+=(const dtype x) { return add(x); }
 
   Tensor Tensor::operator+(const Tensor &b) const {
     auto c = *this;
@@ -261,15 +329,15 @@ namespace NN {
 
   Tensor &Tensor::operator+=(const Tensor &b) { return add(b); }
 
-  Tensor Tensor::operator-(const float x) const { return csub(x); }
+  Tensor Tensor::operator-(const dtype x) const { return csub(x); }
 
-  Tensor operator-(const float x, const Tensor &a) {
+  Tensor operator-(const dtype x, const Tensor &a) {
     auto c = -a;
     c.add(x);
     return c;
   }
 
-  Tensor &Tensor::operator-=(const float x) { return sub(x); }
+  Tensor &Tensor::operator-=(const dtype x) { return sub(x); }
 
   Tensor &Tensor::operator-=(const Tensor &b) { return sub(b); }
 
@@ -279,45 +347,21 @@ namespace NN {
     return c;
   }
 
-  Tensor Tensor::operator*(const float x) const { return cmul(x); }
+  Tensor Tensor::operator*(const dtype x) const { return cmul(x); }
 
-  Tensor operator*(const float x, const Tensor &a) { return a.cmul(x); }
+  Tensor operator*(const dtype x, const Tensor &a) { return a.cmul(x); }
 
-  Tensor &Tensor::operator*=(const float x) { return mul(x); }
+  Tensor &Tensor::operator*=(const dtype x) { return mul(x); }
 
-  Tensor Tensor::operator/(const float x) const {
-    if (x == 0.0f)
+  Tensor Tensor::operator/(const dtype x) const {
+    if (x == 0)
       throw std::domain_error("Division by zero.");
     return cmul(1 / x);
   }
 
-  Tensor &Tensor::operator/=(const float x) {
-    if (x == 0.0f)
+  Tensor &Tensor::operator/=(const dtype x) {
+    if (x == 0)
       throw std::domain_error("Division by zero.");
     return mul(1 / x);
-  }
-
-  float Tensor::sum() const {
-    if (empty())
-      return 0;
-    return std::ranges::fold_left(data, 0.0f, [](float s, float x) { return s + x; });
-  }
-
-  float Tensor::mean() const {
-    if (empty())
-      return 0;
-    return sum() / num_el;
-  }
-
-  float Tensor::min() const {
-    if (empty())
-      throw std::domain_error("Cant find minimum of empty tensor.");
-    return *std::ranges::min_element(data);
-  }
-
-  float Tensor::max() const {
-    if (empty())
-      throw std::domain_error("Cant find maximum of empty tensor.");
-    return *std::ranges::max_element(data);
   }
 } // namespace NN
