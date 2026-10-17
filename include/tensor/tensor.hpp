@@ -1,6 +1,5 @@
 #pragma once
 
-#include <algorithm>
 #include <array>
 #include <concepts>
 #include <initializer_list>
@@ -140,13 +139,8 @@ namespace NN {
       return reshape<std::initializer_list<T> &>(l);
     }
 
-    Tensor &transpose() {
-      if (shape.size() != 2)
-        throw std::invalid_argument("Transpose requires 2D tensor.");
-      std::ranges::reverse(shape);
-      std::ranges::reverse(strides);
-      return *this;
-    }
+    Tensor &transpose();
+    Tensor ctranspose() const;
 
     Tensor &add(const float x);
     Tensor &sub(const float x);

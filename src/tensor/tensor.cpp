@@ -93,6 +93,30 @@ namespace NN {
     return *this;
   }
 
+  Tensor &Tensor::transpose() {
+    if (shape.size() != 2)
+      throw std::invalid_argument("Transpose requires 2D tensor.");
+    if (empty())
+      throw std::invalid_argument("Empty tensor.");
+    if (data.size() != num_el)
+      throw std::invalid_argument("Malformed tensor data.");
+    const size_t r = shape[0], c = shape[1];
+    std::vector<float> out(num_el);
+    for (size_t i = 0; i < r; i++)
+      for (size_t j = 0; j < c; j++)
+        out[j * r + i] = data[i * c + j];
+    data = std::move(out);
+    std::ranges::reverse(shape);
+    strides = compute_strides(shape);
+    return *this;
+  }
+
+  Tensor Tensor::ctranspose() const {
+    auto c = *this;
+    c.transpose();
+    return c;
+  }
+
   Tensor &Tensor::add(const float x) {
     if (empty())
       throw std::invalid_argument("Empty tensor.");
