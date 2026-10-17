@@ -22,6 +22,8 @@ int main() {
   std::println("with utils: {}", a.cadd(b).mul(a).data);
   a.at(1, 2) = 7;
   std::println("a[1,2] = 7: {}", a.data);
+  a[0, 1] = 8;
+  std::println("a[0,1] = 8: {}", a.data);
 
   NN::Tensor{}.set_dims({1, 2}).set_data({2, 3}) + NN::Tensor{}.set_dims({1, 2}).set_data({3, 4});
   NN::Tensor(1, 2).at(0, 1);

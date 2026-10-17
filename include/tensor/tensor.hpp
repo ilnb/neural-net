@@ -44,7 +44,7 @@ namespace NN {
     }
 
     template <typename... Args>
-      requires(std::integral<Args> && ...)
+      requires(std::integral<Args> and ...)
     explicit Tensor(Args... dims) : shape{static_cast<size_t>(dims)...} {
       const size_t n = checked_num_el(shape);
       finalize_shape(n, false);
@@ -60,7 +60,7 @@ namespace NN {
     }
 
     template <typename... Args>
-      requires(std::convertible_to<Args, float> && ...)
+      requires(std::convertible_to<Args, float> and ...)
     Tensor &set_data(Args... vals) {
       return set_data(std::array<float, sizeof...(Args)>{static_cast<float>(vals)...});
     }
@@ -90,7 +90,7 @@ namespace NN {
           throw std::out_of_range("Tensor index out of bounds.");
         offset += it[i] * strides[i];
       }
-      return data[offset];
+      return data.at(offset);
     }
 
     template <typename T>
@@ -100,9 +100,21 @@ namespace NN {
     }
 
     template <typename... Args>
-      requires(std::integral<Args> && ...)
+      requires(std::integral<Args> and ...)
     float &at(Args... idx) {
       return at(std::array<size_t, sizeof...(Args)>{static_cast<size_t>(idx)...});
+    }
+
+    template <typename... Args>
+      requires(std::integral<Args> and ...)
+    float &operator[](Args... idx) {
+      if (sizeof...(idx) != shape.size())
+        throw std::invalid_argument("Number of indices doesnt match tensor rank.");
+      std::array<size_t, sizeof...(Args)> tmp{static_cast<size_t>(idx)...};
+      size_t offset = 0;
+      for (size_t i = 0; i < shape.size(); i++)
+        offset += tmp[i] * strides[i];
+      return data[offset];
     }
 
     Tensor &add(const Tensor &b);
