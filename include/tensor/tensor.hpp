@@ -117,6 +117,28 @@ namespace NN {
       return data[offset];
     }
 
+    template <typename R>
+      requires ConvIntervalOf<R, size_t> and std::ranges::sized_range<R> and std::integral<std::ranges::range_value_t<R>>
+    Tensor &reshape(R &&r) {
+      const size_t n = checked_num_el(r);
+      if (n != num_el)
+        throw std::invalid_argument("Incompatible target shape.");
+      auto it = std::ranges::begin(r);
+      size_t acc = 1;
+      for (size_t i = std::ranges::size(r); i-- > 0;) {
+        shape[i] = it[i];
+        strides[i] = acc;
+        acc *= it[i];
+      }
+      return *this;
+    }
+
+    template <typename T>
+      requires std::integral<T>
+    Tensor &reshape(std::initializer_list<T> l) {
+      return reshape<std::initializer_list<T> &>(l);
+    }
+
     Tensor &add(const Tensor &b);
     // Creates another tensor
     Tensor cadd(const Tensor &b) const;
