@@ -55,7 +55,14 @@ namespace NN {
 
   bool Tensor::valid_strides() const {
     // NOTE: contiguous row-major; relax once non-contiguous views exist.
-    return strides == compute_strides(shape);
+    if (strides.size() != shape.size())
+      return false;
+    for (size_t i = shape.size(), acc = 1; i-- > 0;) {
+      if (strides[i] != acc)
+        return false;
+      acc *= shape[i];
+    }
+    return true;
   }
 
   bool Tensor::empty() const { return num_el == 0 or data.size() == 0; }
@@ -101,7 +108,10 @@ namespace NN {
 
   Tensor Tensor::add(const Tensor &a, const Tensor &b) {
     auto c = a;
-    return c.add(b);
+    c.add(b);
+    return c;
+  }
+
   Tensor Tensor::cadd(const float x) const {
     auto c = *this;
     c.add(x);
@@ -110,7 +120,9 @@ namespace NN {
 
   Tensor Tensor::cadd(const Tensor &b) const {
     auto c = *this;
-    return c.add(b);
+    c.add(b);
+    return c;
+  }
 
   Tensor &Tensor::sub(const float x) {
     if (empty())
@@ -127,7 +139,9 @@ namespace NN {
 
   Tensor Tensor::sub(const Tensor &a, const Tensor &b) {
     auto c = a;
-    return c.sub(b);
+    c.sub(b);
+    return c;
+  }
 
   Tensor Tensor::csub(const float x) const {
     auto c = *this;
@@ -137,7 +151,8 @@ namespace NN {
 
   Tensor Tensor::csub(const Tensor &b) const {
     auto c = *this;
-    return c.sub(b);
+    c.sub(b);
+    return c;
   }
 
   Tensor &Tensor::mul(const Tensor &b) {
@@ -155,12 +170,20 @@ namespace NN {
 
   Tensor Tensor::mul(const Tensor &a, const Tensor &b) {
     auto c = a;
-    return c.mul(b);
+    c.mul(b);
+    return c;
+  }
+
+  Tensor Tensor::cmul(const float x) const {
+    auto c = *this;
+    c.mul(x);
+    return c;
   }
 
   Tensor Tensor::cmul(const Tensor &b) const {
     auto c = *this;
-    return c.mul(b);
+    c.mul(b);
+    return c;
   }
 
   Tensor &Tensor::matmul(const Tensor &b) {
@@ -184,12 +207,15 @@ namespace NN {
 
   Tensor Tensor::cmatmul(const Tensor &b) const {
     auto c = *this;
-    return c.matmul(b);
+    c.matmul(b);
+    return c;
   }
 
   Tensor Tensor::matmul(const Tensor &a, const Tensor &b) {
     auto c = a;
-    return c.matmul(b);
+    c.matmul(b);
+    return c;
+  }
 
   Tensor Tensor::operator-() const {
     auto c = *this;
@@ -205,12 +231,19 @@ namespace NN {
 
   Tensor Tensor::operator+(const Tensor &b) const {
     auto c = *this;
-    return c.add(b);
+    c.add(b);
+    return c;
   }
 
   Tensor &Tensor::operator+=(const Tensor &b) { return add(b); }
 
   Tensor Tensor::operator-(const float x) const { return csub(x); }
+
+  Tensor operator-(const float x, const Tensor &a) {
+    auto c = -a;
+    c.add(x);
+    return c;
+  }
 
   Tensor &Tensor::operator-=(const float x) { return sub(x); }
 
@@ -218,7 +251,8 @@ namespace NN {
 
   Tensor Tensor::operator-(const Tensor &b) const {
     auto c = *this;
-    return c.sub(b);
+    c.sub(b);
+    return c;
   }
 
   Tensor Tensor::operator*(const float x) const { return cmul(x); }
@@ -239,4 +273,27 @@ namespace NN {
     return mul(1 / x);
   }
 
+  float Tensor::sum() const {
+    if (empty())
+      return 0;
+    return std::ranges::fold_left(data, 0.0f, [](float s, float x) { return s + x; });
+  }
+
+  float Tensor::mean() const {
+    if (empty())
+      return 0;
+    return sum() / num_el;
+  }
+
+  float Tensor::min() const {
+    if (empty())
+      throw std::domain_error("Cant find minimum of empty tensor.");
+    return *std::ranges::min_element(data);
+  }
+
+  float Tensor::max() const {
+    if (empty())
+      throw std::domain_error("Cant find maximum of empty tensor.");
+    return *std::ranges::max_element(data);
+  }
 } // namespace NN

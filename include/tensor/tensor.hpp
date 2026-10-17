@@ -148,17 +148,21 @@ namespace NN {
       return *this;
     }
 
+    Tensor &add(const float x);
+    Tensor &sub(const float x);
+    Tensor &mul(const float x);
     Tensor &add(const Tensor &b);
-    // Creates another tensor
-    Tensor cadd(const Tensor &b) const;
     Tensor &sub(const Tensor &b);
-    // Creates another tensor
-    Tensor csub(const Tensor &b) const;
     Tensor &mul(const Tensor &b);
-    // Creates another tensor
-    Tensor cmul(const Tensor &b) const;
     Tensor &matmul(const Tensor &b);
-    // Creates another tensor
+
+    // Copy based ops
+    Tensor cadd(const float x) const;
+    Tensor csub(const float x) const;
+    Tensor cmul(const float x) const;
+    Tensor cadd(const Tensor &b) const;
+    Tensor csub(const Tensor &b) const;
+    Tensor cmul(const Tensor &b) const;
     Tensor cmatmul(const Tensor &b) const;
 
     static Tensor add(const Tensor &a, const Tensor &b);
@@ -189,6 +193,10 @@ namespace NN {
     Tensor &operator-=(const Tensor &b);
 
     bool empty() const;
+    float sum() const;
+    float mean() const;
+    float max() const;
+    float min() const;
 
   private:
     template <typename R>
