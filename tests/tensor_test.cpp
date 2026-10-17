@@ -20,12 +20,43 @@ int main() {
   std::println("c = a + b : {}", c.data);
   std::println("d = c * a : {}", d.data);
   std::println("with utils: {}", a.cadd(b).mul(a).data);
+  std::println();
+
   a.at(1, 2) = 7;
   std::println("a[1,2] = 7: {}", a.data);
   a[0, 1] = 8;
   std::println("a[0,1] = 8: {}", a.data);
+  std::println();
 
-  NN::Tensor{}.set_dims({1, 2}).set_data({2, 3}) + NN::Tensor{}.set_dims({1, 2}).set_data({3, 4});
-  NN::Tensor(1, 2).at(0, 1);
+  NN::Tensor t(2, 3);
+  t.set_data({1, 2, 3, 4, 5, 6});
+
+  t.transpose();
+  std::println("transpose: {}", t.data);
+  std::println("shape: {}", t.shape);
+  std::println("strides: {}", t.strides);
+  for (int i = 0; i < 2; i++)
+    for (int j = 0; j < 2; j++)
+      std::println("t[{},{}] = {}", i, j, t[i, j]);
+
+  const NN::Tensor ct = t;
+  std::println("const t[1,0] = {}", ct[1, 0]);
+  std::println();
+
+  try {
+    NN::Tensor x(2, 3, 4);
+    x.transpose();
+  } catch (const std::invalid_argument &e) {
+    std::println("transpose rank test: {}", e.what());
+  }
+  std::println();
+
+  NN::Tensor r(2, 3);
+  r.set_data({1, 2, 3, 4, 5, 6});
+  r.transpose().transpose();
+  std::println("double transpose: {}", r.data);
+  std::println("double transpose shape: {}", r.shape);
+  std::println("double transpose strides: {}", r.strides);
+  std::println();
   return 0;
 }

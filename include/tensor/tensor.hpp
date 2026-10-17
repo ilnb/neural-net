@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <concepts>
 #include <initializer_list>
@@ -78,43 +79,43 @@ namespace NN {
     // Clears data vector if @clear is set
     Tensor &set_dims(std::vector<size_t> &&v, const bool clear = true);
 
-    template <typename R>
+    template <typename Self, typename R>
       requires ConvIntervalOf<R, size_t> and std::ranges::sized_range<R> and std::integral<std::ranges::range_value_t<R>>
-    float &at(R &&r) {
-      if (std::ranges::size(r) != shape.size())
+    decltype(auto) at(this Self &&self, R &&r) {
+      if (std::ranges::size(r) != self.shape.size())
         throw std::invalid_argument("Number of indices doesnt match tensor rank.");
       auto it = std::ranges::begin(r); // supports more types
       size_t offset = 0;
-      for (size_t i = 0; i < shape.size(); i++) {
-        if (it[i] >= shape[i])
+      for (size_t i = 0; i < self.shape.size(); i++) {
+        if (it[i] >= self.shape[i])
           throw std::out_of_range("Tensor index out of bounds.");
-        offset += it[i] * strides[i];
+        offset += it[i] * self.strides[i];
       }
-      return data.at(offset);
+      return self.data.at(offset);
     }
 
-    template <typename T>
+    template <typename Self, typename T>
       requires std::integral<T>
-    float &at(std::initializer_list<T> l) {
-      return at<std::initializer_list<T> &>(l); // bounds above to itr-indexing
+    decltype(auto) at(this Self &&self, std::initializer_list<T> l) {
+      return self.template at<std::initializer_list<T> &>(l); // bounds above to itr-indexing
     }
 
-    template <typename... Args>
+    template <typename Self, typename... Args>
       requires(std::integral<Args> and ...)
-    float &at(Args... idx) {
-      return at(std::array<size_t, sizeof...(Args)>{static_cast<size_t>(idx)...});
+    decltype(auto) at(this Self &&self, Args... idx) {
+      return self.at(std::array<size_t, sizeof...(Args)>{static_cast<size_t>(idx)...});
     }
 
-    template <typename... Args>
+    template <typename Self, typename... Args>
       requires(std::integral<Args> and ...)
-    float &operator[](Args... idx) {
-      if (sizeof...(idx) != shape.size())
+    decltype(auto) operator[](this Self &&self, Args... idx) {
+      if (sizeof...(idx) != self.shape.size())
         throw std::invalid_argument("Number of indices doesnt match tensor rank.");
       std::array<size_t, sizeof...(Args)> tmp{static_cast<size_t>(idx)...};
       size_t offset = 0;
-      for (size_t i = 0; i < shape.size(); i++)
-        offset += tmp[i] * strides[i];
-      return data[offset];
+      for (size_t i = 0; i < self.shape.size(); i++)
+        offset += tmp[i] * self.strides[i];
+      return self.data[offset];
     }
 
     template <typename R>
@@ -139,6 +140,14 @@ namespace NN {
       return reshape<std::initializer_list<T> &>(l);
     }
 
+    Tensor &transpose() {
+      if (shape.size() != 2)
+        throw std::invalid_argument("Transpose requires 2D tensor.");
+      std::ranges::reverse(shape);
+      std::ranges::reverse(strides);
+      return *this;
+    }
+
     Tensor &add(const Tensor &b);
     // Creates another tensor
     Tensor cadd(const Tensor &b) const;
@@ -148,10 +157,14 @@ namespace NN {
     Tensor &mul(const Tensor &b);
     // Creates another tensor
     Tensor cmul(const Tensor &b) const;
+    Tensor &matmul(const Tensor &b);
+    // Creates another tensor
+    Tensor cmatmul(const Tensor &b) const;
 
     static Tensor add(const Tensor &a, const Tensor &b);
     static Tensor sub(const Tensor &a, const Tensor &b);
     static Tensor mul(const Tensor &a, const Tensor &b);
+    static Tensor matmul(const Tensor &a, const Tensor &b);
 
     Tensor operator+(const Tensor &b) const;
     Tensor &operator+=(const Tensor &b);

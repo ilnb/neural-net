@@ -132,6 +132,35 @@ namespace NN {
     return c.mul(b);
   }
 
+  Tensor &Tensor::matmul(const Tensor &b) {
+    if (shape.size() != 2 or b.shape.size() != 2)
+      throw std::invalid_argument("Tensor should be rank 2 for matmul");
+    if (shape[1] != b.shape[0])
+      throw std::invalid_argument("Incompatible tensors for matmul.");
+
+    Tensor ret(shape[0], b.shape[1]);
+    for (size_t i = 0; i < shape[0]; i++) {
+      for (size_t j = 0; j < b.shape[1]; j++) {
+        float sum = 0.0f;
+        for (size_t k = 0; k < shape[1]; k++)
+          sum += at(i, k) * b.at(k, j);
+        ret.at(i, j) = sum;
+      }
+    }
+    *this = std::move(ret);
+    return *this;
+  }
+
+  Tensor Tensor::cmatmul(const Tensor &b) const {
+    auto c = *this;
+    return c.matmul(b);
+  }
+
+  Tensor Tensor::matmul(const Tensor &a, const Tensor &b) {
+    auto c = a;
+    return c.matmul(b);
+  }
+
   Tensor Tensor::operator+(const Tensor &b) const {
     auto c = *this;
     return c.add(b);
